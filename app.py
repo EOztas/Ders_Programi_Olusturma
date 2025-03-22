@@ -23,9 +23,9 @@ from sqlalchemy import inspect, text
 # - Ders programı oluşturma ve Excel'e aktarma
 # =====================================================================================
 
-# Uygulama dizinini al
-TEMPLATE_DIR = r"C:\Users\4143e\ders_programı\pythonProject1\templates"
-DB_PATH = r"C:\Users\4143e\ders_programı\pythonProject1\ders_programi.db"
+# Göreceli yolları kullanarak dizinleri belirle
+TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ders_programi.db')
 
 # Flask uygulamasını oluştur ve yapılandır
 app = Flask(__name__, template_folder=TEMPLATE_DIR)

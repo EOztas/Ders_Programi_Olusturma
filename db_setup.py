@@ -3,8 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from models import db, Department, Course, Classroom, User
 import os
 
-# Uygulama dizinini al
-DB_PATH = r"C:\Users\4143e\ders_programı\pythonProject1\ders_programi.db"
+# Göreceli yol kullanarak veritabanı dosyasını mevcut dizinde oluştur
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ders_programi.db')
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH

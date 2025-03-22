@@ -1,8 +1,12 @@
 from flask import Flask
 from models import db, Department, Course, Classroom, User, Schedule
+import os
+
+# Göreceli yol kullanarak veritabanı dosyasını belirle
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ders_programi.db')
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///ders_programi.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DB_PATH
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
