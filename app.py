@@ -632,14 +632,11 @@ def export_schedule():
         
         # Sütun genişliklerini ayarla
         ws.column_dimensions['A'].width = 15  # Günler için
-        for col in range(2, 7):  # Derslik sütunları için
+        for col in range(2, 6):  # 1-4 sınıflar için
             ws.column_dimensions[chr(64 + col)].width = 30
             
         # Haftanın günleri
         days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma']
-        
-        # Tüm derslikleri getir
-        classrooms = Classroom.query.order_by(Classroom.code).all()
         
         # Stil tanımları
         header_font = Font(bold=True, color="FFFFFF")
@@ -660,9 +657,15 @@ def export_schedule():
             bottom=Side(style='thin')
         )
         
-        # Başlık satırını hazırla
-        for col, classroom in enumerate(classrooms, start=1):
-            cell = ws.cell(row=1, column=col+1, value=classroom.code)
+        # Başlık satırını hazırla - Sınıf seviyelerini ekle
+        ws.cell(row=1, column=1, value="Gün/Sınıf").font = header_font
+        ws.cell(row=1, column=1).fill = header_fill
+        ws.cell(row=1, column=1).alignment = header_alignment
+        ws.cell(row=1, column=1).border = thin_border
+        
+        # Sınıf seviyelerini başlıklara ekle (1. Sınıf, 2. Sınıf, vb.)
+        for grade in range(1, 5):  # 1-4. sınıflar
+            cell = ws.cell(row=1, column=grade+1, value=f"{grade}. Sınıf")
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = header_alignment
@@ -677,39 +680,71 @@ def export_schedule():
             cell.alignment = day_alignment
             cell.border = thin_border
             
-            # Her derslik için bu günde olan programları bul
-            for col, classroom in enumerate(classrooms, start=1):
-                cell = ws.cell(row=row, column=col+1, value="")
+            # Her sınıf seviyesi için bu günde olan programları bul
+            for grade in range(1, 5):  # 1-4. sınıflar
+                cell = ws.cell(row=row, column=grade+1, value="")
                 cell.border = thin_border
                 cell.alignment = cell_alignment
                 
-                # Bu gün ve derslikte olan programları bul
-                schedule_items = Schedule.query.filter_by(
-                    day=day,
-                    classroom_id=classroom.id
-                ).order_by(Schedule.start_time).all()
+                # Bu sınıfın yarıyıllarını belirle (her sınıf 2 yarıyıl içerir)
+                # 1. sınıf: 1-2, 2. sınıf: 3-4, 3. sınıf: 5-6, 4. sınıf: 7-8
+                first_semester = (grade - 1) * 2 + 1
+                second_semester = first_semester + 1
+                semesters = [first_semester, second_semester]
                 
-                # Program varsa hücreye ekle
-                if schedule_items:
-                    cell_text = []
-                    for item in schedule_items:
-                        course = Course.query.get(item.course_id)
-                        instructor = User.query.get(course.instructor_id) if course.instructor_id else None
-                        
-                        course_info = (
-                            f"{course.code} - {course.name}\n"
-                            f"Saat: {item.start_time}-{item.end_time}"
-                        )
-                        
-                        if instructor:
-                            course_info += f"\nÖğr. Üyesi: {instructor.name}"
-                            
-                        cell_text.append(course_info)
+                # Bu gün ve sınıf seviyesinde olan dersleri bul
+                # BLM ve YZM bölümlerini birlikte göster
+                blm_dept = Department.query.filter_by(code='BLM').first()
+                yzm_dept = Department.query.filter_by(code='YZM').first()
+                
+                if blm_dept and yzm_dept:
+                    # Bu sınıfın yarıyıllarındaki dersleri bul
+                    blm_courses = Course.query.filter(
+                        Course.semester.in_(semesters),
+                        Course.department_id == blm_dept.id
+                    ).all()
                     
-                    cell.value = "\n\n".join(cell_text)
+                    yzm_courses = Course.query.filter(
+                        Course.semester.in_(semesters),
+                        Course.department_id == yzm_dept.id
+                    ).all()
+                    
+                    # Tüm kurs ID'lerini birleştir
+                    course_ids = [course.id for course in blm_courses + yzm_courses]
+                    
+                    if course_ids:
+                        # Bu günde ve bu kurslarda olan programları bul
+                        schedule_items = Schedule.query.filter(
+                            Schedule.day == day,
+                            Schedule.course_id.in_(course_ids)
+                        ).order_by(Schedule.start_time).all()
+                        
+                        # Program varsa hücreye ekle
+                        if schedule_items:
+                            cell_text = []
+                            for item in schedule_items:
+                                course = Course.query.get(item.course_id)
+                                classroom = Classroom.query.get(item.classroom_id)
+                                instructor = User.query.get(course.instructor_id) if course.instructor_id else None
+                                
+                                # Dersin yarıyılını da ekle
+                                dept_code = Department.query.get(course.department_id).code if course.department_id else ''
+                                
+                                course_info = (
+                                    f"{course.code} - {course.name} ({dept_code}, {course.semester}. Yarıyıl)\n"
+                                    f"Derslik: {classroom.code if classroom else 'Belirtilmemiş'}\n"
+                                    f"Saat: {item.start_time}-{item.end_time}"
+                                )
+                                
+                                if instructor:
+                                    course_info += f"\nÖğr. Üyesi: {instructor.name}"
+                                    
+                                cell_text.append(course_info)
+                            
+                            cell.value = "\n\n".join(cell_text)
             
             # Satır yüksekliğini ayarla
-            ws.row_dimensions[row].height = 120
+            ws.row_dimensions[row].height = 150
             
         # Geçici dosya oluştur ve Excel'i kaydet
         with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
